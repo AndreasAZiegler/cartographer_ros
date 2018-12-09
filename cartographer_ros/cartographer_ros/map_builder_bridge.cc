@@ -487,6 +487,43 @@ visualization_msgs::MarkerArray MapBuilderBridge::GetConstraintList() {
   return constraint_list;
 }
 
+std::vector<cartographer_ros_msgs::LoopClosure> MapBuilderBridge::GetLoopClosures() {
+
+  std::vector<cartographer_ros_msgs::LoopClosure> loop_closures;
+
+  const auto trajectory_node_poses =
+      map_builder_->pose_graph()->GetTrajectoryNodePoses();
+  const auto submap_poses = map_builder_->pose_graph()->GetAllSubmapPoses();
+  const auto constraints = map_builder_->pose_graph()->constraints();
+
+  for (const auto& constraint : constraints) {
+    const auto submap_it = submap_poses.find(constraint.submap_id);
+    if (submap_it == submap_poses.end()) {
+      continue;
+    }
+    const auto& submap_pose = submap_it->data.pose;
+
+    const auto node_it = trajectory_node_poses.find(constraint.node_id);
+    if (node_it == trajectory_node_poses.end()) {
+      continue;
+    }
+
+    const Rigid3d constraint_pose = submap_pose * constraint.pose.zbar_ij;
+
+    cartographer_ros_msgs::LoopClosure lc;
+    lc.pose1.header.stamp = ros::Time::now();
+    lc.pose1.header.frame_id = node_options_.map_frame;
+    lc.pose2.header.stamp = ros::Time::now();
+    lc.pose2.header.frame_id = node_options_.map_frame;
+
+    lc.pose1.pose = ToGeometryMsgPose(submap_pose);
+    lc.pose2.pose = ToGeometryMsgPose(constraint_pose);
+
+    loop_closures.push_back(lc);
+  }
+  return loop_closures;
+}
+
 SensorBridge* MapBuilderBridge::sensor_bridge(const int trajectory_id) {
   return sensor_bridges_.at(trajectory_id).get();
 }

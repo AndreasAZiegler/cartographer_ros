@@ -34,6 +34,7 @@ add_message_files(
     SubmapTexture.msg
     SensorTopics.msg
     TrajectoryOptions.msg
+    LoopClosure.msg
 )
 
 add_service_files(

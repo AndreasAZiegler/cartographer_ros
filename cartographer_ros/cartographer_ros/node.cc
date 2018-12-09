@@ -101,6 +101,9 @@ Node::Node(
   constraint_list_publisher_ =
       node_handle_.advertise<::visualization_msgs::MarkerArray>(
           kConstraintListTopic, kLatestOnlyPublisherQueueSize);
+  loop_closure_publisher_ =
+      node_handle_.advertise<::cartographer_ros_msgs::LoopClosure>(
+          kLoopClosureListTopic, kLatestOnlyPublisherQueueSize);
   service_servers_.push_back(node_handle_.advertiseService(
       kSubmapQueryServiceName, &Node::HandleSubmapQuery, this));
   service_servers_.push_back(node_handle_.advertiseService(
@@ -129,6 +132,9 @@ Node::Node(
   wall_timers_.push_back(node_handle_.createWallTimer(
       ::ros::WallDuration(kConstraintPublishPeriodSec),
       &Node::PublishConstraintList, this));
+  wall_timers_.push_back(node_handle_.createWallTimer(
+      ::ros::WallDuration(kConstraintPublishPeriodSec),
+      &Node::PublishLoopClosures, this));
 }
 
 Node::~Node() { FinishAllTrajectories(); }
@@ -285,6 +291,21 @@ void Node::PublishConstraintList(
     constraint_list_publisher_.publish(map_builder_bridge_.GetConstraintList());
   }
 }
+
+void Node::PublishLoopClosures(
+    const ::ros::WallTimerEvent& unused_timer_event) {
+
+  if (loop_closure_publisher_.getNumSubscribers() > 0) {
+
+    carto::common::MutexLocker lock(&mutex_);
+    auto loop_closures = map_builder_bridge_.GetLoopClosures();
+
+    for (auto& lc : loop_closures) {
+      loop_closure_publisher_.publish(lc);
+    }
+  }
+}
+
 
 std::set<cartographer::mapping::TrajectoryBuilderInterface::SensorId>
 Node::ComputeExpectedSensorIds(
